@@ -9,7 +9,7 @@ interface PrepareViewProps {
 export function PrepareView({ exercise, onStart, onAbort }: PrepareViewProps) {
   return (
     <main className="app-shell simple-view">
-      <section className="focus-panel" aria-labelledby="prepare-title">
+      <section className="focus-panel prepare-panel" aria-labelledby="prepare-title">
         <h1 id="prepare-title">{exercise.title}</h1>
         <p className="short-copy prepare-copy">{exercise.preparationText}</p>
       </section>

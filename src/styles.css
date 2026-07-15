@@ -204,7 +204,12 @@ h2 {
 }
 
 .timer-header {
+  padding-top: 10px;
   text-align: center;
+}
+
+.prepare-panel {
+  padding-top: 38px;
 }
 
 .phase-label {
