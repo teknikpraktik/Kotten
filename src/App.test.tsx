@@ -85,7 +85,7 @@ describe('App workout flow', () => {
     expect(document.body.textContent).toContain('Byt ben');
     expect(getStoredCompletionCount()).toBe(0);
 
-    await advanceTimers(3_000);
+    await advanceTimers(5_000);
 
     expect(document.body.textContent).toContain('Andra benet');
     await advanceTimers(60_000);

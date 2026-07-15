@@ -11,7 +11,15 @@ export function HomeView({ stats, soundEnabled, onToggleSound, onStart }: HomeVi
   return (
     <main className="app-shell home-view">
       <section className="hero-panel" aria-labelledby="home-title">
-        <div className="pinecone-mark" aria-hidden="true" />
+        <img
+          className="home-logo"
+          src="/icons/kotten-icon.svg"
+          width="96"
+          height="96"
+          alt=""
+          aria-hidden="true"
+          decoding="async"
+        />
         <p className="kicker">Dagens träning</p>
         <h1 id="home-title">Kotten</h1>
         <p className="duration">4 minuter</p>

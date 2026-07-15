@@ -34,7 +34,7 @@ type FlowState =
   | { screen: 'completed' };
 
 const SOUND_STORAGE_KEY = 'kotten.sound.enabled';
-const BALANCE_SWITCH_SECONDS = 3;
+const BALANCE_SWITCH_SECONDS = 5;
 const workoutDurationSeconds = getWorkoutDurationSeconds(WORKOUT_PLAN);
 
 function loadSoundPreference(): boolean {
