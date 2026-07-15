@@ -46,8 +46,6 @@ export function useAbsoluteTimer(onComplete: () => void): AbsoluteTimerControls 
   }, []);
 
   const syncRunningTimer = useCallback(() => {
-    let shouldComplete = false;
-
     setState((current) => {
       if (current.status !== 'running') {
         return current;
@@ -56,7 +54,6 @@ export function useAbsoluteTimer(onComplete: () => void): AbsoluteTimerControls 
       const remainingMs = getRemainingMsFromEndTime(current.endTimeMs, Date.now());
 
       if (remainingMs === 0) {
-        shouldComplete = true;
         return toCompletedTimer(current.durationMs);
       }
 
@@ -69,11 +66,13 @@ export function useAbsoluteTimer(onComplete: () => void): AbsoluteTimerControls 
         remainingMs
       };
     });
+  }, []);
 
-    if (shouldComplete) {
+  useEffect(() => {
+    if (state.status === 'completed') {
       triggerComplete();
     }
-  }, [triggerComplete]);
+  }, [state.status, triggerComplete]);
 
   useEffect(() => {
     if (state.status !== 'running') {
@@ -102,22 +101,14 @@ export function useAbsoluteTimer(onComplete: () => void): AbsoluteTimerControls 
   }, []);
 
   const pause = useCallback(() => {
-    let shouldComplete = false;
-
     setState((current) => {
       if (current.status !== 'running') {
         return current;
       }
 
-      const nextState = pauseRunningTimer(current, Date.now());
-      shouldComplete = nextState.status === 'completed';
-      return nextState;
+      return pauseRunningTimer(current, Date.now());
     });
-
-    if (shouldComplete) {
-      triggerComplete();
-    }
-  }, [triggerComplete]);
+  }, []);
 
   const resume = useCallback(() => {
     setState((current) => {
