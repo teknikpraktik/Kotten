@@ -99,9 +99,12 @@ a:focus-visible {
   margin: 0 auto;
   padding: calc(10px + env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
     calc(12px + env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
+.flow-view,
 .home-view,
 .timer-view,
 .centered-view {
@@ -183,8 +186,32 @@ h1 {
     4px 4px 0 rgb(255 184 220 / 0.55);
 }
 
+.eyebrow {
+  display: inline-block;
+  margin: 0 0 5px;
+  padding: 3px 9px 4px;
+  border: 2px solid rgb(114 91 145 / 0.24);
+  border-radius: 8px;
+  background: #fff7cf;
+  color: #735514;
+  font-size: 0.82rem;
+  font-weight: 950;
+  line-height: 1.05;
+}
+
+h2 {
+  margin: 0 0 8px;
+  color: var(--color-ink);
+  font-size: 1.08rem;
+  font-weight: 950;
+  line-height: 1.1;
+}
+
 .status-panel,
+.instruction-panel,
+.next-panel,
 .message-panel,
+.history-section,
 .timer-panel {
   position: relative;
   overflow: hidden;
@@ -199,7 +226,10 @@ h1 {
 }
 
 .status-panel::before,
+.instruction-panel::before,
+.next-panel::before,
 .message-panel::before,
+.history-section::before,
 .timer-panel::before {
   position: absolute;
   inset: 0 0 auto;
@@ -215,9 +245,23 @@ h1 {
 }
 
 .status-panel > *,
+.instruction-panel > *,
+.next-panel > *,
 .message-panel > *,
+.history-section > *,
 .timer-panel > * {
   position: relative;
+}
+
+.status-text {
+  margin: 0 0 10px;
+  color: var(--color-muted);
+  font-size: 0.98rem;
+  font-weight: 900;
+}
+
+.status-text--done {
+  color: var(--color-mint-strong);
 }
 
 .stats-grid {
@@ -259,6 +303,70 @@ h1 {
   font-size: 0.82rem;
   font-weight: 950;
   line-height: 1.1;
+}
+
+.instruction-panel,
+.next-panel,
+.history-section {
+  padding: 18px 14px 12px;
+}
+
+.instruction-list {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding-left: 1.15rem;
+}
+
+.instruction-list li {
+  padding-left: 2px;
+  color: var(--color-ink);
+  font-size: 0.95rem;
+  font-weight: 820;
+  line-height: 1.22;
+}
+
+.instruction-list li::marker {
+  color: var(--color-pink-strong);
+  font-size: 1.15em;
+}
+
+.next-panel p {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 1rem;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.history-list {
+  display: grid;
+  gap: 7px;
+  max-height: 128px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.history-list li {
+  padding: 8px 10px;
+  border: 2px solid rgb(114 91 145 / 0.18);
+  border-radius: 8px;
+  background: #fff7cf;
+  color: var(--color-ink);
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.history-list li:nth-child(even) {
+  background: #e5f7ff;
+}
+
+.empty-state {
+  margin: 0;
+  color: var(--color-muted);
+  font-weight: 850;
 }
 
 .flow-header,
@@ -324,6 +432,15 @@ h1 {
   text-align: center;
 }
 
+.timer-instruction {
+  max-width: 28rem;
+  margin: 0 0 8px;
+  color: var(--color-ink);
+  font-size: 1.02rem;
+  font-weight: 900;
+  line-height: 1.18;
+}
+
 .timer-panel::after {
   right: 18px;
   bottom: 12px;
@@ -374,6 +491,25 @@ h1 {
   text-align: center;
 }
 
+.message-main,
+.message-muted {
+  margin: 0;
+}
+
+.message-main {
+  color: var(--color-ink);
+  font-size: 1.2rem;
+  font-weight: 950;
+  line-height: 1.15;
+}
+
+.message-muted {
+  margin-top: 6px;
+  color: var(--color-muted);
+  font-size: 0.95rem;
+  font-weight: 850;
+}
+
 .message-panel::after {
   left: 18px;
   bottom: 12px;
@@ -398,6 +534,13 @@ h1 {
   gap: 8px;
 }
 
+.exercise-navigation {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin: 10px 0 0;
+}
+
 .button {
   width: 100%;
   min-height: 50px;
@@ -416,9 +559,20 @@ h1 {
     filter 100ms ease;
 }
 
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+  box-shadow: none;
+  transform: none;
+}
+
 .button:active {
   transform: translateY(3px);
   box-shadow: 0 1px 0 rgb(64 50 95 / 0.26);
+}
+
+.button:disabled:active {
+  transform: none;
 }
 
 .button--primary {
@@ -445,6 +599,14 @@ h1 {
   border-color: var(--color-alert);
   background: #ffd7e9;
   color: #7d2945;
+}
+
+.button--nav {
+  min-height: 40px;
+  padding: 8px 10px;
+  border-color: #5c579b;
+  background: var(--color-lilac);
+  font-size: 0.88rem;
 }
 
 .timer-actions {

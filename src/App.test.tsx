@@ -10,11 +10,13 @@ const reactActGlobal = globalThis as typeof globalThis & {
 
 reactActGlobal.IS_REACT_ACT_ENVIRONMENT = true;
 
-function getFirstButton(): HTMLButtonElement {
-  const button = document.querySelector('button');
+function getButtonByText(text: string): HTMLButtonElement {
+  const button = Array.from(document.querySelectorAll('button')).find(
+    (element) => element.textContent?.trim() === text
+  );
 
   if (!(button instanceof HTMLButtonElement)) {
-    throw new Error('Expected a button to be rendered.');
+    throw new Error(`Expected a button named "${text}" to be rendered.`);
   }
 
   return button;
@@ -45,14 +47,18 @@ describe('App workout flow', () => {
   });
 
   it('automatically starts the right-leg phase after the left-leg countdown', async () => {
-    const rightLegPhaseLabel = 'Höger ben';
+    const rightLegInstruction = getWorkoutSteps(WORKOUT_PLAN)[1].phase.instruction;
 
     act(() => {
       root.render(<App />);
     });
 
     act(() => {
-      getFirstButton().click();
+      getButtonByText('Starta passet').click();
+    });
+
+    act(() => {
+      getButtonByText('Starta').click();
     });
 
     await act(async () => {
@@ -65,10 +71,10 @@ describe('App workout flow', () => {
       await flushMicrotasks();
     });
 
-    expect(document.body.textContent).toContain(rightLegPhaseLabel);
+    expect(document.body.textContent).toContain(rightLegInstruction);
   });
 
-  it('continues to the next exercise without a text interstitial', async () => {
+  it('shows the exercise-complete text interstitial before the next exercise', async () => {
     const nextExerciseTitle = getWorkoutSteps(WORKOUT_PLAN)[2].phase.title;
 
     act(() => {
@@ -76,7 +82,11 @@ describe('App workout flow', () => {
     });
 
     act(() => {
-      getFirstButton().click();
+      getButtonByText('Starta passet').click();
+    });
+
+    act(() => {
+      getButtonByText('Starta').click();
     });
 
     await act(async () => {
@@ -94,7 +104,34 @@ describe('App workout flow', () => {
       await flushMicrotasks();
     });
 
-    expect(document.body.textContent).toContain(nextExerciseTitle);
-    expect(document.body.textContent).not.toContain('Fortsätt');
+    expect(document.body.textContent).toContain(`Nästa övning är ${nextExerciseTitle}.`);
+    expect(document.body.textContent).toContain('Fortsätt');
+  });
+
+  it('can jump forward and backward between exercise preparation screens', () => {
+    const balanceTitle = getWorkoutSteps(WORKOUT_PLAN)[0].exercise.title;
+    const stairTitle = getWorkoutSteps(WORKOUT_PLAN)[2].exercise.title;
+
+    act(() => {
+      root.render(<App />);
+    });
+
+    act(() => {
+      getButtonByText('Starta passet').click();
+    });
+
+    expect(document.body.textContent).toContain(balanceTitle);
+
+    act(() => {
+      getButtonByText('Nästa').click();
+    });
+
+    expect(document.body.textContent).toContain(stairTitle);
+
+    act(() => {
+      getButtonByText('Föregående').click();
+    });
+
+    expect(document.body.textContent).toContain(balanceTitle);
   });
 });

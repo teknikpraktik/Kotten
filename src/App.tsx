@@ -15,11 +15,13 @@ import { speakSwedish, warmUpSpeechVoices } from './lib/speech';
 import { vibrate } from './lib/vibration';
 import type { SpeechCue, WorkoutCompletion } from './types';
 import { HomeView } from './components/HomeView';
+import { PrepareView } from './components/PrepareView';
 import { TimerView } from './components/TimerView';
 import { SwitchLegView } from './components/SwitchLegView';
+import { ExerciseCompleteView } from './components/ExerciseCompleteView';
 import { FinishView } from './components/FinishView';
 
-type FlowScreen = 'home' | 'timer' | 'switch-leg' | 'finished';
+type FlowScreen = 'home' | 'prepare' | 'timer' | 'switch-leg' | 'exercise-complete' | 'finished';
 
 const steps = getWorkoutSteps(WORKOUT_PLAN);
 const workoutDurationSeconds = getWorkoutDurationSeconds(WORKOUT_PLAN);
@@ -38,16 +40,23 @@ function getSafeStep(index: number) {
   return steps[Math.min(Math.max(index, 0), steps.length - 1)];
 }
 
+function getFirstStepIndexForExercise(exerciseIndex: number): number {
+  const safeExerciseIndex = Math.min(Math.max(exerciseIndex, 0), WORKOUT_PLAN.exercises.length - 1);
+  const stepIndex = steps.findIndex((step) => step.exerciseIndex === safeExerciseIndex);
+  return stepIndex >= 0 ? stepIndex : 0;
+}
+
 export default function App() {
   const [history, setHistory] = useState<WorkoutCompletion[]>(() => loadWorkoutHistory());
   const [screen, setScreen] = useState<FlowScreen>('home');
   const [phaseIndex, setPhaseIndex] = useState(0);
-  const [phaseStartToken, setPhaseStartToken] = useState(0);
   const [switchRemainingSeconds, setSwitchRemainingSeconds] = useState(3);
   const [liveMessage, setLiveMessage] = useState('Kotten är redo.');
 
   const currentStep = getSafeStep(phaseIndex);
   const stats = useMemo(() => calculateStreakStats(history), [history]);
+  const canGoPreviousExercise = currentStep.exerciseIndex > 0;
+  const canGoNextExercise = currentStep.exerciseIndex < WORKOUT_PLAN.exercises.length - 1;
 
   const completeWorkout = useCallback(() => {
     const completion = createWorkoutCompletion(
@@ -84,10 +93,7 @@ export default function App() {
       return;
     }
 
-    const nextIndex = Math.min(phaseIndex + 1, steps.length - 1);
-    setPhaseIndex(nextIndex);
-    setPhaseStartToken((token) => token + 1);
-    setScreen('timer');
+    setScreen('exercise-complete');
   }, [completeWorkout, phaseIndex]);
 
   const {
@@ -105,21 +111,17 @@ export default function App() {
 
   const startWorkout = useCallback(() => {
     setPhaseIndex(0);
-    setSwitchRemainingSeconds(3);
-    setPhaseStartToken((token) => token + 1);
-    setScreen('timer');
+    setScreen('prepare');
+    setLiveMessage('Gör dig redo.');
   }, []);
 
-  useEffect(() => {
-    if (screen !== 'timer') {
-      return;
-    }
-
+  const startCurrentPhase = useCallback(() => {
     const step = getSafeStep(phaseIndex);
+    setScreen('timer');
     setLiveMessage(step.phase.instruction);
     sendFeedback(step.phase.startSpeech, 'start', 40);
     startTimer(step.phase.durationSeconds * 1000);
-  }, [phaseIndex, phaseStartToken, screen, startTimer]);
+  }, [phaseIndex, startTimer]);
 
   const abortWorkout = useCallback(() => {
     stopTimer();
@@ -128,6 +130,32 @@ export default function App() {
     setSwitchRemainingSeconds(3);
     setLiveMessage('Passet avbröts.');
   }, [stopTimer]);
+
+  const jumpToExercise = useCallback(
+    (exerciseIndex: number) => {
+      stopTimer();
+      setPhaseIndex(getFirstStepIndexForExercise(exerciseIndex));
+      setSwitchRemainingSeconds(3);
+      setScreen('prepare');
+      setLiveMessage('Gör dig redo.');
+    },
+    [stopTimer]
+  );
+
+  const goToPreviousExercise = useCallback(() => {
+    jumpToExercise(currentStep.exerciseIndex - 1);
+  }, [currentStep.exerciseIndex, jumpToExercise]);
+
+  const goToNextExercise = useCallback(() => {
+    jumpToExercise(currentStep.exerciseIndex + 1);
+  }, [currentStep.exerciseIndex, jumpToExercise]);
+
+  const continueToNextExercise = useCallback(() => {
+    const nextIndex = Math.min(phaseIndex + 1, steps.length - 1);
+    setPhaseIndex(nextIndex);
+    setScreen('prepare');
+    setLiveMessage('Gör dig redo för nästa övning.');
+  }, [phaseIndex]);
 
   const returnHome = useCallback(() => {
     stopTimer();
@@ -157,19 +185,36 @@ export default function App() {
         window.clearInterval(intervalId);
         const nextIndex = Math.min(phaseIndex + 1, steps.length - 1);
         setPhaseIndex(nextIndex);
-        setPhaseStartToken((token) => token + 1);
         setScreen('timer');
+        const nextStep = getSafeStep(nextIndex);
+        setLiveMessage(nextStep.phase.instruction);
+        sendFeedback(nextStep.phase.startSpeech, 'start', 40);
+        startTimer(nextStep.phase.durationSeconds * 1000);
       }
     };
 
     const intervalId = window.setInterval(tick, 100);
     tick();
     return () => window.clearInterval(intervalId);
-  }, [currentStep, phaseIndex, screen]);
+  }, [currentStep, phaseIndex, screen, startTimer]);
 
   const renderScreen = () => {
     if (screen === 'home') {
       return <HomeView stats={stats} onStart={startWorkout} />;
+    }
+
+    if (screen === 'prepare') {
+      return (
+        <PrepareView
+          step={currentStep}
+          onStart={startCurrentPhase}
+          onAbort={abortWorkout}
+          canGoPrevious={canGoPreviousExercise}
+          canGoNext={canGoNextExercise}
+          onPreviousExercise={goToPreviousExercise}
+          onNextExercise={goToNextExercise}
+        />
+      );
     }
 
     if (screen === 'timer') {
@@ -180,6 +225,10 @@ export default function App() {
           onPause={pauseTimer}
           onResume={resumeTimer}
           onAbort={abortWorkout}
+          canGoPrevious={canGoPreviousExercise}
+          canGoNext={canGoNextExercise}
+          onPreviousExercise={goToPreviousExercise}
+          onNextExercise={goToNextExercise}
         />
       );
     }
@@ -190,11 +239,30 @@ export default function App() {
           step={currentStep}
           remainingSeconds={switchRemainingSeconds}
           onAbort={abortWorkout}
+          canGoPrevious={canGoPreviousExercise}
+          canGoNext={canGoNextExercise}
+          onPreviousExercise={goToPreviousExercise}
+          onNextExercise={goToNextExercise}
         />
       );
     }
 
-    return <FinishView onHome={returnHome} />;
+    if (screen === 'exercise-complete') {
+      return (
+        <ExerciseCompleteView
+          completedStep={currentStep}
+          nextStep={getSafeStep(phaseIndex + 1)}
+          onContinue={continueToNextExercise}
+          onAbort={abortWorkout}
+          canGoPrevious={canGoPreviousExercise}
+          canGoNext={canGoNextExercise}
+          onPreviousExercise={goToPreviousExercise}
+          onNextExercise={goToNextExercise}
+        />
+      );
+    }
+
+    return <FinishView stats={stats} onHome={returnHome} />;
   };
 
   return (

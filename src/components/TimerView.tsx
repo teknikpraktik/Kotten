@@ -1,5 +1,6 @@
 import { formatRemainingTime, type TimerState } from '../lib/timer';
 import type { WorkoutStep } from '../types';
+import { ExerciseNavigation } from './ExerciseNavigation';
 import { ProgressDots } from './ProgressDots';
 
 interface TimerViewProps {
@@ -8,21 +9,23 @@ interface TimerViewProps {
   onPause: () => void;
   onResume: () => void;
   onAbort: () => void;
+  canGoPrevious: boolean;
+  canGoNext: boolean;
+  onPreviousExercise: () => void;
+  onNextExercise: () => void;
 }
 
-function getShortPhaseLabel(step: WorkoutStep): string {
-  if (step.phase.id.endsWith('-left')) {
-    return 'Vänster ben';
-  }
-
-  if (step.phase.id.endsWith('-right')) {
-    return 'Höger ben';
-  }
-
-  return step.phase.title;
-}
-
-export function TimerView({ step, timer, onPause, onResume, onAbort }: TimerViewProps) {
+export function TimerView({
+  step,
+  timer,
+  onPause,
+  onResume,
+  onAbort,
+  canGoPrevious,
+  canGoNext,
+  onPreviousExercise,
+  onNextExercise
+}: TimerViewProps) {
   const isPaused = timer.status === 'paused';
   const elapsedRatio =
     timer.durationMs > 0 ? 1 - Math.max(0, timer.remainingMs) / timer.durationMs : 0;
@@ -31,15 +34,25 @@ export function TimerView({ step, timer, onPause, onResume, onAbort }: TimerView
   return (
     <main className="app-shell timer-view">
       <header className="timer-header">
+        <p className="eyebrow">
+          Övning {step.exerciseIndex + 1} av {step.totalExercises} · Fas {step.globalPhaseIndex + 1}{' '}
+          av {step.totalPhases}
+        </p>
         <h1>{step.phase.title}</h1>
-        <p className="phase-label">{getShortPhaseLabel(step)}</p>
         <ProgressDots total={step.totalPhases} currentIndex={step.globalPhaseIndex} />
+        <ExerciseNavigation
+          canGoPrevious={canGoPrevious}
+          canGoNext={canGoNext}
+          onPrevious={onPreviousExercise}
+          onNext={onNextExercise}
+        />
       </header>
 
       <section className="timer-panel" aria-labelledby="timer-title">
         <h2 id="timer-title" className="sr-only">
           Timer
         </h2>
+        <p className="timer-instruction">{step.phase.instruction}</p>
         <output className="timer-value" aria-live="polite" aria-label="Återstående tid">
           {formatRemainingTime(timer.remainingMs)}
         </output>
