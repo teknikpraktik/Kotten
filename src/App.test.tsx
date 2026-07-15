@@ -109,7 +109,7 @@ describe('App workout flow', () => {
     expect(document.body.textContent).toContain('Tåhävningar med tennisboll');
     await advanceTimers(60_000);
 
-    expect(document.body.textContent).toContain('Passet är klart');
+    expect(document.body.textContent).toContain('Bra jobbat, du blir starkare!');
     expect(getStoredCompletionCount()).toBe(1);
   });
 
