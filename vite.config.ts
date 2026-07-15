@@ -4,6 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 const themeColor = '#fbf4e8';
 const backgroundColor = '#fbf4e8';
+const cacheId = 'kotten-clean-flow-v2';
 
 export default defineConfig({
   plugins: [
@@ -45,9 +46,12 @@ export default defineConfig({
         ]
       },
       workbox: {
+        cacheId,
         globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
         navigateFallback: '/index.html',
-        cleanupOutdatedCaches: true
+        cleanupOutdatedCaches: true,
+        skipWaiting: true,
+        clientsClaim: true
       }
     })
   ],
