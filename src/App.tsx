@@ -15,13 +15,11 @@ import { speakSwedish, warmUpSpeechVoices } from './lib/speech';
 import { vibrate } from './lib/vibration';
 import type { SpeechCue, WorkoutCompletion } from './types';
 import { HomeView } from './components/HomeView';
-import { PrepareView } from './components/PrepareView';
 import { TimerView } from './components/TimerView';
 import { SwitchLegView } from './components/SwitchLegView';
-import { ExerciseCompleteView } from './components/ExerciseCompleteView';
 import { FinishView } from './components/FinishView';
 
-type FlowScreen = 'home' | 'prepare' | 'timer' | 'switch-leg' | 'exercise-complete' | 'finished';
+type FlowScreen = 'home' | 'timer' | 'switch-leg' | 'finished';
 
 const steps = getWorkoutSteps(WORKOUT_PLAN);
 const workoutDurationSeconds = getWorkoutDurationSeconds(WORKOUT_PLAN);
@@ -44,6 +42,7 @@ export default function App() {
   const [history, setHistory] = useState<WorkoutCompletion[]>(() => loadWorkoutHistory());
   const [screen, setScreen] = useState<FlowScreen>('home');
   const [phaseIndex, setPhaseIndex] = useState(0);
+  const [phaseStartToken, setPhaseStartToken] = useState(0);
   const [switchRemainingSeconds, setSwitchRemainingSeconds] = useState(3);
   const [liveMessage, setLiveMessage] = useState('Kotten är redo.');
 
@@ -85,7 +84,10 @@ export default function App() {
       return;
     }
 
-    setScreen('exercise-complete');
+    const nextIndex = Math.min(phaseIndex + 1, steps.length - 1);
+    setPhaseIndex(nextIndex);
+    setPhaseStartToken((token) => token + 1);
+    setScreen('timer');
   }, [completeWorkout, phaseIndex]);
 
   const {
@@ -103,17 +105,21 @@ export default function App() {
 
   const startWorkout = useCallback(() => {
     setPhaseIndex(0);
-    setScreen('prepare');
-    setLiveMessage('Gör dig redo.');
+    setSwitchRemainingSeconds(3);
+    setPhaseStartToken((token) => token + 1);
+    setScreen('timer');
   }, []);
 
-  const startCurrentPhase = useCallback(() => {
+  useEffect(() => {
+    if (screen !== 'timer') {
+      return;
+    }
+
     const step = getSafeStep(phaseIndex);
-    setScreen('timer');
     setLiveMessage(step.phase.instruction);
     sendFeedback(step.phase.startSpeech, 'start', 40);
     startTimer(step.phase.durationSeconds * 1000);
-  }, [phaseIndex, startTimer]);
+  }, [phaseIndex, phaseStartToken, screen, startTimer]);
 
   const abortWorkout = useCallback(() => {
     stopTimer();
@@ -122,13 +128,6 @@ export default function App() {
     setSwitchRemainingSeconds(3);
     setLiveMessage('Passet avbröts.');
   }, [stopTimer]);
-
-  const continueToNextExercise = useCallback(() => {
-    const nextIndex = Math.min(phaseIndex + 1, steps.length - 1);
-    setPhaseIndex(nextIndex);
-    setScreen('prepare');
-    setLiveMessage('Gör dig redo för nästa övning.');
-  }, [phaseIndex]);
 
   const returnHome = useCallback(() => {
     stopTimer();
@@ -158,26 +157,19 @@ export default function App() {
         window.clearInterval(intervalId);
         const nextIndex = Math.min(phaseIndex + 1, steps.length - 1);
         setPhaseIndex(nextIndex);
+        setPhaseStartToken((token) => token + 1);
         setScreen('timer');
-        const nextStep = getSafeStep(nextIndex);
-        setLiveMessage(nextStep.phase.instruction);
-        sendFeedback(nextStep.phase.startSpeech, 'start', 40);
-        startTimer(nextStep.phase.durationSeconds * 1000);
       }
     };
 
     const intervalId = window.setInterval(tick, 100);
     tick();
     return () => window.clearInterval(intervalId);
-  }, [currentStep, phaseIndex, screen, startTimer]);
+  }, [currentStep, phaseIndex, screen]);
 
   const renderScreen = () => {
     if (screen === 'home') {
       return <HomeView stats={stats} onStart={startWorkout} />;
-    }
-
-    if (screen === 'prepare') {
-      return <PrepareView step={currentStep} onStart={startCurrentPhase} onAbort={abortWorkout} />;
     }
 
     if (screen === 'timer') {
@@ -202,18 +194,7 @@ export default function App() {
       );
     }
 
-    if (screen === 'exercise-complete') {
-      return (
-        <ExerciseCompleteView
-          completedStep={currentStep}
-          nextStep={getSafeStep(phaseIndex + 1)}
-          onContinue={continueToNextExercise}
-          onAbort={abortWorkout}
-        />
-      );
-    }
-
-    return <FinishView stats={stats} onHome={returnHome} />;
+    return <FinishView onHome={returnHome} />;
   };
 
   return (

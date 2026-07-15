@@ -45,14 +45,10 @@ describe('App workout flow', () => {
   });
 
   it('automatically starts the right-leg phase after the left-leg countdown', async () => {
-    const rightLegInstruction = getWorkoutSteps(WORKOUT_PLAN)[1].phase.instruction;
+    const rightLegPhaseLabel = 'Höger ben';
 
     act(() => {
       root.render(<App />);
-    });
-
-    act(() => {
-      getFirstButton().click();
     });
 
     act(() => {
@@ -69,6 +65,36 @@ describe('App workout flow', () => {
       await flushMicrotasks();
     });
 
-    expect(document.body.textContent).toContain(rightLegInstruction);
+    expect(document.body.textContent).toContain(rightLegPhaseLabel);
+  });
+
+  it('continues to the next exercise without a text interstitial', async () => {
+    const nextExerciseTitle = getWorkoutSteps(WORKOUT_PLAN)[2].phase.title;
+
+    act(() => {
+      root.render(<App />);
+    });
+
+    act(() => {
+      getFirstButton().click();
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+      await flushMicrotasks();
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(3_000);
+      await flushMicrotasks();
+    });
+
+    await act(async () => {
+      vi.advanceTimersByTime(60_000);
+      await flushMicrotasks();
+    });
+
+    expect(document.body.textContent).toContain(nextExerciseTitle);
+    expect(document.body.textContent).not.toContain('Fortsätt');
   });
 });
