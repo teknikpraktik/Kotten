@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Kotten ikon">
+  <rect width="512" height="512" fill="#44624A"/>
+  <circle cx="256" cy="256" r="230" fill="#F7F1E5"/>
+  <path d="M256 70c84 58 134 137 134 231 0 80-58 130-134 130s-134-50-134-130c0-94 50-173 134-231Z" fill="#44624A"/>
+  <path d="M256 116c51 43 84 111 84 187 0 60-33 89-84 89s-84-29-84-89c0-76 33-144 84-187Z" fill="#8A4F35"/>
+  <path d="M199 229h114M180 290h152M207 352h99" stroke="#F7F1E5" stroke-width="30" stroke-linecap="round"/>
+  <path d="M256 78c-24 38-38 76-38 110M256 78c24 38 38 76 38 110" stroke="#263F2C" stroke-width="22" stroke-linecap="round"/>
+</svg>
