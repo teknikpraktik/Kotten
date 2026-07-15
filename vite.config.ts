@@ -4,7 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 const themeColor = '#fbf4e8';
 const backgroundColor = '#fbf4e8';
-const cacheId = 'kotten-clean-flow-v2';
+const cacheId = 'kotten-pastel-icon-v3';
 
 export default defineConfig({
   plugins: [
