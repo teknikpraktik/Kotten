@@ -15,6 +15,13 @@ describe('timer logic', () => {
     expect(getRemainingMsFromEndTime(10_000, 12_000)).toBe(0);
   });
 
+  it('counts a 60 second timer down to zero from the absolute end time', () => {
+    const running = createRunningTimer(60_000, 5_000);
+
+    expect(getRemainingMsFromEndTime(running.endTimeMs, 5_000)).toBe(60_000);
+    expect(getRemainingMsFromEndTime(running.endTimeMs, 65_000)).toBe(0);
+  });
+
   it('pauses a running timer with the current remaining time', () => {
     const running = createRunningTimer(60_000, 1_000);
     const paused = pauseRunningTimer(running, 21_500);

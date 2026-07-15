@@ -1,54 +1,17 @@
-import type { WorkoutStep } from '../types';
-import { ExerciseNavigation } from './ExerciseNavigation';
-import { ProgressDots } from './ProgressDots';
+import type { WorkoutExercise } from '../types';
 
 interface PrepareViewProps {
-  step: WorkoutStep;
+  exercise: WorkoutExercise;
   onStart: () => void;
   onAbort: () => void;
-  canGoPrevious: boolean;
-  canGoNext: boolean;
-  onPreviousExercise: () => void;
-  onNextExercise: () => void;
 }
 
-export function PrepareView({
-  step,
-  onStart,
-  onAbort,
-  canGoPrevious,
-  canGoNext,
-  onPreviousExercise,
-  onNextExercise
-}: PrepareViewProps) {
+export function PrepareView({ exercise, onStart, onAbort }: PrepareViewProps) {
   return (
-    <main className="app-shell flow-view">
-      <header className="flow-header">
-        <p className="eyebrow">
-          Övning {step.exerciseIndex + 1} av {step.totalExercises}
-        </p>
-        <h1>{step.exercise.title}</h1>
-        <ProgressDots total={step.totalPhases} currentIndex={step.globalPhaseIndex} />
-        <ExerciseNavigation
-          canGoPrevious={canGoPrevious}
-          canGoNext={canGoNext}
-          onPrevious={onPreviousExercise}
-          onNext={onNextExercise}
-        />
-      </header>
-
-      <section className="instruction-panel" aria-labelledby="prepare-title">
-        <h2 id="prepare-title">Gör dig redo</h2>
-        <ul className="instruction-list">
-          {step.exercise.preparation.map((instruction) => (
-            <li key={instruction}>{instruction}</li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="next-panel" aria-labelledby="next-title">
-        <h2 id="next-title">När timern startar</h2>
-        <p>{step.phase.instruction}</p>
+    <main className="app-shell simple-view">
+      <section className="focus-panel" aria-labelledby="prepare-title">
+        <h1 id="prepare-title">{exercise.title}</h1>
+        <p className="short-copy">{exercise.preparationText}</p>
       </section>
 
       <div className="button-stack">
@@ -56,7 +19,7 @@ export function PrepareView({
           Starta
         </button>
         <button className="button button--quiet" type="button" onClick={onAbort}>
-          Till startsidan
+          Avbryt passet
         </button>
       </div>
     </main>

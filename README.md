@@ -80,8 +80,8 @@ om appen stängs helt.
 
 - iPhone kan kräva att PWA:n öppnas via Safari och läggs till på hemskärmen för
   bästa fristående upplevelse.
-- Web Speech API, vibration och Screen Wake Lock stöds olika mellan webbläsare.
-  Kotten använder dem som progressiv förbättring och fungerar utan dem.
+- Screen Wake Lock stöds olika mellan webbläsare. Kotten försöker använda det under aktiv
+  träning men fungerar utan det.
 - Ljud kan blockeras av webbläsaren tills användaren har interagerat med appen.
 - Wake Lock kan nekas eller släppas av systemet, särskilt vid låg batterinivå
   eller när appen går till bakgrunden.

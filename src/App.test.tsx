@@ -2,7 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
-import { getWorkoutSteps, WORKOUT_PLAN } from './data/training';
+import { HISTORY_STORAGE_KEY } from './lib/history';
 
 const reactActGlobal = globalThis as typeof globalThis & {
   IS_REACT_ACT_ENVIRONMENT: boolean;
@@ -22,8 +22,22 @@ function getButtonByText(text: string): HTMLButtonElement {
   return button;
 }
 
-async function flushMicrotasks(): Promise<void> {
-  await Promise.resolve();
+async function advanceTimers(ms: number): Promise<void> {
+  await act(async () => {
+    vi.advanceTimersByTime(ms);
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
+function getStoredCompletionCount(): number {
+  const storedValue = localStorage.getItem(HISTORY_STORAGE_KEY);
+  if (!storedValue) {
+    return 0;
+  }
+
+  const payload = JSON.parse(storedValue) as { completions?: unknown[] };
+  return payload.completions?.length ?? 0;
 }
 
 describe('App workout flow', () => {
@@ -32,6 +46,7 @@ describe('App workout flow', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 6, 15, 9, 0, 0));
     localStorage.clear();
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -46,9 +61,59 @@ describe('App workout flow', () => {
     vi.useRealTimers();
   });
 
-  it('automatically starts the right-leg phase after the left-leg countdown', async () => {
-    const rightLegInstruction = getWorkoutSteps(WORKOUT_PLAN)[1].phase.instruction;
+  it('runs the full guided workout and stores completion only after the final phase', async () => {
+    act(() => {
+      root.render(<App />);
+    });
 
+    expect(document.body.textContent).toContain('Kotten');
+
+    act(() => {
+      getButtonByText('Starta passet').click();
+    });
+
+    expect(document.body.textContent).toContain('Balansbräda');
+    expect(document.body.textContent).toContain('1 minut per ben.');
+
+    act(() => {
+      getButtonByText('Starta').click();
+    });
+
+    expect(document.body.textContent).toContain('Första benet');
+    await advanceTimers(60_000);
+
+    expect(document.body.textContent).toContain('Byt ben');
+    expect(getStoredCompletionCount()).toBe(0);
+
+    await advanceTimers(3_000);
+
+    expect(document.body.textContent).toContain('Andra benet');
+    await advanceTimers(60_000);
+
+    expect(document.body.textContent).toContain('Tåhävningar i trappa');
+    expect(document.body.textContent).toContain('1 minut.');
+
+    act(() => {
+      getButtonByText('Starta').click();
+    });
+
+    expect(document.body.textContent).toContain('Tåhävningar i trappa');
+    await advanceTimers(60_000);
+
+    expect(document.body.textContent).toContain('Tåhävningar med tennisboll');
+
+    act(() => {
+      getButtonByText('Starta').click();
+    });
+
+    expect(document.body.textContent).toContain('Tåhävningar med tennisboll');
+    await advanceTimers(60_000);
+
+    expect(document.body.textContent).toContain('Passet är klart');
+    expect(getStoredCompletionCount()).toBe(1);
+  });
+
+  it('does not store an aborted workout', () => {
     act(() => {
       root.render(<App />);
     });
@@ -61,77 +126,17 @@ describe('App workout flow', () => {
       getButtonByText('Starta').click();
     });
 
-    await act(async () => {
-      vi.advanceTimersByTime(60_000);
-      await flushMicrotasks();
+    act(() => {
+      getButtonByText('Avbryt').click();
     });
 
-    await act(async () => {
-      vi.advanceTimersByTime(3_000);
-      await flushMicrotasks();
-    });
-
-    expect(document.body.textContent).toContain(rightLegInstruction);
-  });
-
-  it('shows the exercise-complete text interstitial before the next exercise', async () => {
-    const nextExerciseTitle = getWorkoutSteps(WORKOUT_PLAN)[2].phase.title;
+    expect(document.body.textContent).toContain('Vill du avsluta passet?');
 
     act(() => {
-      root.render(<App />);
+      getButtonByText('Avsluta passet').click();
     });
 
-    act(() => {
-      getButtonByText('Starta passet').click();
-    });
-
-    act(() => {
-      getButtonByText('Starta').click();
-    });
-
-    await act(async () => {
-      vi.advanceTimersByTime(60_000);
-      await flushMicrotasks();
-    });
-
-    await act(async () => {
-      vi.advanceTimersByTime(3_000);
-      await flushMicrotasks();
-    });
-
-    await act(async () => {
-      vi.advanceTimersByTime(60_000);
-      await flushMicrotasks();
-    });
-
-    expect(document.body.textContent).toContain(`Nästa övning är ${nextExerciseTitle}.`);
-    expect(document.body.textContent).toContain('Fortsätt');
-  });
-
-  it('can jump forward and backward between exercise preparation screens', () => {
-    const balanceTitle = getWorkoutSteps(WORKOUT_PLAN)[0].exercise.title;
-    const stairTitle = getWorkoutSteps(WORKOUT_PLAN)[2].exercise.title;
-
-    act(() => {
-      root.render(<App />);
-    });
-
-    act(() => {
-      getButtonByText('Starta passet').click();
-    });
-
-    expect(document.body.textContent).toContain(balanceTitle);
-
-    act(() => {
-      getButtonByText('Nästa').click();
-    });
-
-    expect(document.body.textContent).toContain(stairTitle);
-
-    act(() => {
-      getButtonByText('Föregående').click();
-    });
-
-    expect(document.body.textContent).toContain(balanceTitle);
+    expect(document.body.textContent).toContain('Kotten');
+    expect(getStoredCompletionCount()).toBe(0);
   });
 });

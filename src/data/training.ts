@@ -1,4 +1,4 @@
-import type { PassVersion, WorkoutPlan, WorkoutStep } from '../types';
+import type { PassVersion, WorkoutExercise, WorkoutPhase, WorkoutPlan } from '../types';
 
 export const PASS_VERSION: PassVersion = 'kotten-v1';
 
@@ -8,103 +8,56 @@ export const WORKOUT_PLAN: WorkoutPlan = {
     {
       id: 'balance-board',
       title: 'Balansbräda',
-      preparation: [
-        'Ställ balansbrädan stadigt.',
-        'Ha något tryggt nära om du behöver stöd.',
-        'Första minuten görs på vänster ben.'
-      ],
+      preparationText: '1 minut per ben.',
       phases: [
         {
-          id: 'balance-left',
+          id: 'balance-first-leg',
+          exerciseId: 'balance-board',
           title: 'Balansbräda',
-          instruction: 'Stå på vänster ben på balansbrädan.',
-          durationSeconds: 60,
-          startSpeech: 'Start',
-          completionSpeech: 'Byt ben',
-          transition: {
-            kind: 'auto-countdown-to-next-phase',
-            message: 'Byt ben',
-            countdownSeconds: 3
-          }
+          label: 'Första benet',
+          durationSeconds: 60
         },
         {
-          id: 'balance-right',
+          id: 'balance-second-leg',
+          exerciseId: 'balance-board',
           title: 'Balansbräda',
-          instruction: 'Stå på höger ben på balansbrädan.',
-          durationSeconds: 60,
-          startSpeech: 'Start',
-          completionSpeech: 'Övningen är klar'
+          label: 'Andra benet',
+          durationSeconds: 60
         }
       ]
     },
     {
       id: 'stair-calf-raises',
       title: 'Tåhävningar i trappa',
-      preparation: [
-        'Placera framfoten på en vikt handduk på kanten av ett trappsteg.',
-        'Tårna och framfoten vilar på steget.',
-        'Hälarna ska vara fria utanför kanten.',
-        'Håll i räcket.',
-        'Gör lugna tåhävningar under 60 sekunder.'
-      ],
+      preparationText: '1 minut.',
       phases: [
         {
           id: 'stair-calf-raises',
+          exerciseId: 'stair-calf-raises',
           title: 'Tåhävningar i trappa',
-          instruction: 'Gör lugna tåhävningar. Appen räknar inte repetitioner.',
-          durationSeconds: 60,
-          startSpeech: 'Start',
-          completionSpeech: 'Övningen är klar'
+          durationSeconds: 60
         }
       ]
     },
     {
       id: 'ball-calf-raises',
       title: 'Tåhävningar med tennisboll',
-      preparation: [
-        'Stå på ett plant golv.',
-        'Fötterna ska vara parallella.',
-        'Placera en tennisboll mellan hälarna.',
-        'Håll kvar tennisbollen mellan hälarna.',
-        'Gör lugna tåhävningar under 60 sekunder.'
-      ],
+      preparationText: '1 minut.',
       phases: [
         {
           id: 'ball-calf-raises',
+          exerciseId: 'ball-calf-raises',
           title: 'Tåhävningar med tennisboll',
-          instruction: 'Håll kvar tennisbollen mellan hälarna och gör lugna tåhävningar.',
-          durationSeconds: 60,
-          startSpeech: 'Start',
-          completionSpeech: 'Passet är klart'
+          durationSeconds: 60
         }
       ]
     }
   ]
 };
 
-export function getWorkoutSteps(plan: WorkoutPlan = WORKOUT_PLAN): WorkoutStep[] {
-  const totalPhases = plan.exercises.reduce((sum, exercise) => sum + exercise.phases.length, 0);
-  let globalPhaseIndex = 0;
-
-  return plan.exercises.flatMap((exercise, exerciseIndex) =>
-    exercise.phases.map((phase, phaseIndexInExercise) => {
-      const step: WorkoutStep = {
-        exercise,
-        phase,
-        exerciseIndex,
-        phaseIndexInExercise,
-        globalPhaseIndex,
-        totalExercises: plan.exercises.length,
-        totalPhases,
-        isLastPhaseOfExercise: phaseIndexInExercise === exercise.phases.length - 1,
-        isLastPhase: globalPhaseIndex === totalPhases - 1
-      };
-
-      globalPhaseIndex += 1;
-      return step;
-    })
-  );
-}
+export const WORKOUT_PHASES: WorkoutPhase[] = WORKOUT_PLAN.exercises.flatMap(
+  (exercise) => exercise.phases
+);
 
 export function getWorkoutDurationSeconds(plan: WorkoutPlan = WORKOUT_PLAN): number {
   return plan.exercises.reduce(
@@ -113,4 +66,13 @@ export function getWorkoutDurationSeconds(plan: WorkoutPlan = WORKOUT_PLAN): num
       exercise.phases.reduce((phaseSum, phase) => phaseSum + phase.durationSeconds, 0),
     0
   );
+}
+
+export function getExerciseIndexForPhase(phaseIndex: number): number {
+  const phase = WORKOUT_PHASES[Math.min(Math.max(phaseIndex, 0), WORKOUT_PHASES.length - 1)];
+  return WORKOUT_PLAN.exercises.findIndex((exercise) => exercise.id === phase.exerciseId);
+}
+
+export function getFirstPhaseIndexForExercise(exercise: WorkoutExercise): number {
+  return WORKOUT_PHASES.findIndex((phase) => phase.exerciseId === exercise.id);
 }

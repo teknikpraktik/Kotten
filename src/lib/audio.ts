@@ -1,6 +1,6 @@
 import { logDevelopmentWarning } from './logger';
 
-export type ToneKind = 'start' | 'notice' | 'done';
+export type CueKind = 'step' | 'done';
 
 type WindowWithWebkitAudio = Window & {
   webkitAudioContext?: typeof AudioContext;
@@ -23,19 +23,19 @@ function getAudioContext(): AudioContext | null {
   return sharedAudioContext;
 }
 
-function getToneFrequency(kind: ToneKind): number {
-  if (kind === 'start') {
-    return 660;
+export function unlockAudio(): void {
+  try {
+    void getAudioContext()?.resume();
+  } catch (error) {
+    logDevelopmentWarning('Could not unlock audio context.', error);
   }
-
-  if (kind === 'done') {
-    return 880;
-  }
-
-  return 520;
 }
 
-export function playTone(kind: ToneKind): void {
+export function playCue(kind: CueKind, enabled: boolean): void {
+  if (!enabled) {
+    return;
+  }
+
   try {
     const context = getAudioContext();
 
@@ -43,21 +43,25 @@ export function playTone(kind: ToneKind): void {
       return;
     }
 
+    void context.resume();
+
     const oscillator = context.createOscillator();
     const gain = context.createGain();
     const now = context.currentTime;
+    const frequency = kind === 'done' ? 760 : 560;
+    const duration = kind === 'done' ? 0.18 : 0.11;
 
     oscillator.type = 'sine';
-    oscillator.frequency.setValueAtTime(getToneFrequency(kind), now);
+    oscillator.frequency.setValueAtTime(frequency, now);
     gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.12, now + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+    gain.gain.exponentialRampToValueAtTime(0.08, now + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
 
     oscillator.connect(gain);
     gain.connect(context.destination);
     oscillator.start(now);
-    oscillator.stop(now + 0.2);
+    oscillator.stop(now + duration + 0.02);
   } catch (error) {
-    logDevelopmentWarning('Could not play feedback tone.', error);
+    logDevelopmentWarning('Could not play audio cue.', error);
   }
 }

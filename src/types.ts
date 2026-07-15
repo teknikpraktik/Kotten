@@ -1,45 +1,28 @@
 export type PassVersion = 'kotten-v1';
 
-export type SpeechCue = 'Start' | 'Byt ben' | 'Övningen är klar' | 'Passet är klart';
+export type WorkoutExerciseId = 'balance-board' | 'stair-calf-raises' | 'ball-calf-raises';
 
-export interface PhaseTransition {
-  kind: 'auto-countdown-to-next-phase';
-  message: SpeechCue;
-  countdownSeconds: number;
-}
+export type WorkoutPhaseId =
+  'balance-first-leg' | 'balance-second-leg' | 'stair-calf-raises' | 'ball-calf-raises';
 
-export interface TrainingPhase {
-  id: string;
+export interface WorkoutPhase {
+  id: WorkoutPhaseId;
+  exerciseId: WorkoutExerciseId;
   title: string;
-  instruction: string;
+  label?: string;
   durationSeconds: number;
-  startSpeech: SpeechCue;
-  completionSpeech: SpeechCue;
-  transition?: PhaseTransition;
 }
 
-export interface TrainingExercise {
-  id: string;
+export interface WorkoutExercise {
+  id: WorkoutExerciseId;
   title: string;
-  preparation: string[];
-  phases: TrainingPhase[];
+  preparationText: string;
+  phases: WorkoutPhase[];
 }
 
 export interface WorkoutPlan {
   version: PassVersion;
-  exercises: TrainingExercise[];
-}
-
-export interface WorkoutStep {
-  exercise: TrainingExercise;
-  phase: TrainingPhase;
-  exerciseIndex: number;
-  phaseIndexInExercise: number;
-  globalPhaseIndex: number;
-  totalExercises: number;
-  totalPhases: number;
-  isLastPhaseOfExercise: boolean;
-  isLastPhase: boolean;
+  exercises: WorkoutExercise[];
 }
 
 export interface WorkoutCompletion {

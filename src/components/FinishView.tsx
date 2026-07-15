@@ -2,24 +2,20 @@ import type { StreakStats } from '../lib/streak';
 
 interface FinishViewProps {
   stats: StreakStats;
+  completedDate: string;
   onHome: () => void;
 }
 
-export function FinishView({ stats, onHome }: FinishViewProps) {
+export function FinishView({ stats, completedDate, onHome }: FinishViewProps) {
   return (
-    <main className="app-shell centered-view">
-      <header className="finish-header">
-        <img src="/icons/kotten-icon.svg" alt="" className="finish-icon" aria-hidden="true" />
-        <p className="eyebrow">Sparat lokalt</p>
-        <h1>Passet är klart</h1>
-      </header>
-
-      <section className="message-panel" aria-live="polite">
-        <p className="message-main">Bra jobbat. Dagens träningsdag är sparad.</p>
-        <p className="message-muted">
-          Din aktuella streak är {stats.currentStreak} {stats.currentStreak === 1 ? 'dag' : 'dagar'}
-          .
-        </p>
+    <main className="app-shell simple-view">
+      <section className="focus-panel done-panel" aria-labelledby="done-title">
+        <div className="done-mark" aria-hidden="true">
+          ✓
+        </div>
+        <h1 id="done-title">Passet är klart</h1>
+        <p className="short-copy">{completedDate}</p>
+        <p className="streak-line">{stats.currentStreak} dagar i rad</p>
       </section>
 
       <button className="button button--primary" type="button" onClick={onHome}>

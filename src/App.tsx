@@ -1,276 +1,237 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { getWorkoutDurationSeconds, getWorkoutSteps, WORKOUT_PLAN } from './data/training';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  getExerciseIndexForPhase,
+  getFirstPhaseIndexForExercise,
+  getWorkoutDurationSeconds,
+  WORKOUT_PHASES,
+  WORKOUT_PLAN
+} from './data/training';
+import { AbortDialog } from './components/AbortDialog';
+import { FinishView } from './components/FinishView';
+import { HomeView } from './components/HomeView';
+import { PrepareView } from './components/PrepareView';
+import { SwitchLegView } from './components/SwitchLegView';
+import { TimerView } from './components/TimerView';
 import { useAbsoluteTimer } from './hooks/useAbsoluteTimer';
 import { useWakeLock } from './hooks/useWakeLock';
+import { playCue, unlockAudio } from './lib/audio';
 import {
   addWorkoutCompletion,
   createWorkoutCompletion,
   loadWorkoutHistory,
   saveWorkoutHistory
 } from './lib/history';
-import { getRemainingMsFromEndTime } from './lib/timer';
+import { formatLocalDate } from './lib/localDate';
+import { readLocalStorage, writeLocalStorage } from './lib/storage';
 import { calculateStreakStats } from './lib/streak';
-import { playTone, type ToneKind } from './lib/audio';
-import { speakSwedish, warmUpSpeechVoices } from './lib/speech';
-import { vibrate } from './lib/vibration';
-import type { SpeechCue, WorkoutCompletion } from './types';
-import { HomeView } from './components/HomeView';
-import { PrepareView } from './components/PrepareView';
-import { TimerView } from './components/TimerView';
-import { SwitchLegView } from './components/SwitchLegView';
-import { ExerciseCompleteView } from './components/ExerciseCompleteView';
-import { FinishView } from './components/FinishView';
+import type { WorkoutCompletion } from './types';
 
-type FlowScreen = 'home' | 'prepare' | 'timer' | 'switch-leg' | 'exercise-complete' | 'finished';
+type FlowState =
+  | { screen: 'home' }
+  | { screen: 'preparation'; exerciseIndex: number }
+  | { screen: 'active'; phaseIndex: number }
+  | { screen: 'transition'; nextPhaseIndex: number }
+  | { screen: 'completed' };
 
-const steps = getWorkoutSteps(WORKOUT_PLAN);
+const SOUND_STORAGE_KEY = 'kotten.sound.enabled';
+const BALANCE_SWITCH_SECONDS = 3;
 const workoutDurationSeconds = getWorkoutDurationSeconds(WORKOUT_PLAN);
 
-function sendFeedback(
-  message: SpeechCue,
-  tone: ToneKind,
-  vibrationPattern: number | number[]
-): void {
-  speakSwedish(message);
-  playTone(tone);
-  vibrate(vibrationPattern);
+function loadSoundPreference(): boolean {
+  return readLocalStorage(SOUND_STORAGE_KEY) !== 'false';
 }
 
-function getSafeStep(index: number) {
-  return steps[Math.min(Math.max(index, 0), steps.length - 1)];
-}
-
-function getFirstStepIndexForExercise(exerciseIndex: number): number {
-  const safeExerciseIndex = Math.min(Math.max(exerciseIndex, 0), WORKOUT_PLAN.exercises.length - 1);
-  const stepIndex = steps.findIndex((step) => step.exerciseIndex === safeExerciseIndex);
-  return stepIndex >= 0 ? stepIndex : 0;
+function getSafePhaseIndex(index: number): number {
+  return Math.min(Math.max(index, 0), WORKOUT_PHASES.length - 1);
 }
 
 export default function App() {
   const [history, setHistory] = useState<WorkoutCompletion[]>(() => loadWorkoutHistory());
-  const [screen, setScreen] = useState<FlowScreen>('home');
-  const [phaseIndex, setPhaseIndex] = useState(0);
-  const [switchRemainingSeconds, setSwitchRemainingSeconds] = useState(3);
-  const [liveMessage, setLiveMessage] = useState('Kotten är redo.');
+  const [flow, setFlow] = useState<FlowState>({ screen: 'home' });
+  const [abortDialogOpen, setAbortDialogOpen] = useState(false);
+  const [completedDate, setCompletedDate] = useState(() => formatLocalDate(new Date()));
+  const [soundEnabled, setSoundEnabled] = useState(loadSoundPreference);
+  const timerCompleteActionRef = useRef<() => void>(() => undefined);
+  const resumeAfterAbortCancelRef = useRef(false);
 
-  const currentStep = getSafeStep(phaseIndex);
   const stats = useMemo(() => calculateStreakStats(history), [history]);
-  const canGoPreviousExercise = currentStep.exerciseIndex > 0;
-  const canGoNextExercise = currentStep.exerciseIndex < WORKOUT_PLAN.exercises.length - 1;
-
-  const completeWorkout = useCallback(() => {
-    const completion = createWorkoutCompletion(
-      new Date(),
-      workoutDurationSeconds,
-      WORKOUT_PLAN.version
-    );
-    const nextHistory = addWorkoutCompletion(history, completion);
-    setHistory(nextHistory);
-    saveWorkoutHistory(nextHistory);
-    setScreen('finished');
-  }, [history]);
-
-  const completePhase = useCallback(() => {
-    const step = getSafeStep(phaseIndex);
-    setLiveMessage(step.phase.completionSpeech);
-
-    if (step.phase.completionSpeech === 'Passet är klart') {
-      sendFeedback('Passet är klart', 'done', [80, 40, 80]);
-    } else if (step.phase.completionSpeech === 'Byt ben') {
-      sendFeedback('Byt ben', 'notice', [80]);
-    } else {
-      sendFeedback('Övningen är klar', 'done', [60, 30, 60]);
-    }
-
-    if (step.phase.transition?.kind === 'auto-countdown-to-next-phase') {
-      setSwitchRemainingSeconds(step.phase.transition.countdownSeconds);
-      setScreen('switch-leg');
-      return;
-    }
-
-    if (step.isLastPhase) {
-      completeWorkout();
-      return;
-    }
-
-    setScreen('exercise-complete');
-  }, [completeWorkout, phaseIndex]);
-
   const {
     state: timerState,
     start: startTimer,
     pause: pauseTimer,
     resume: resumeTimer,
     stop: stopTimer
-  } = useAbsoluteTimer(completePhase);
+  } = useAbsoluteTimer(() => timerCompleteActionRef.current());
   useWakeLock(timerState.status === 'running');
 
-  useEffect(() => {
-    warmUpSpeechVoices();
-  }, []);
+  const completeWorkout = useCallback(() => {
+    const completedAt = new Date();
+    const completion = createWorkoutCompletion(
+      completedAt,
+      workoutDurationSeconds,
+      WORKOUT_PLAN.version
+    );
+    const nextHistory = addWorkoutCompletion(history, completion);
 
-  const startWorkout = useCallback(() => {
-    setPhaseIndex(0);
-    setScreen('prepare');
-    setLiveMessage('Gör dig redo.');
-  }, []);
+    setCompletedDate(completion.localDate);
+    setHistory(nextHistory);
+    saveWorkoutHistory(nextHistory);
+    setFlow({ screen: 'completed' });
+  }, [history]);
 
-  const startCurrentPhase = useCallback(() => {
-    const step = getSafeStep(phaseIndex);
-    setScreen('timer');
-    setLiveMessage(step.phase.instruction);
-    sendFeedback(step.phase.startSpeech, 'start', 40);
-    startTimer(step.phase.durationSeconds * 1000);
-  }, [phaseIndex, startTimer]);
+  const startPhase = useCallback(
+    (phaseIndex: number) => {
+      const safePhaseIndex = getSafePhaseIndex(phaseIndex);
+      const phase = WORKOUT_PHASES[safePhaseIndex];
 
-  const abortWorkout = useCallback(() => {
-    stopTimer();
-    setScreen('home');
-    setPhaseIndex(0);
-    setSwitchRemainingSeconds(3);
-    setLiveMessage('Passet avbröts.');
-  }, [stopTimer]);
+      unlockAudio();
+      setAbortDialogOpen(false);
+      setFlow({ screen: 'active', phaseIndex: safePhaseIndex });
+      startTimer(phase.durationSeconds * 1000);
+    },
+    [startTimer]
+  );
 
-  const jumpToExercise = useCallback(
+  const goToPreparation = useCallback(
     (exerciseIndex: number) => {
       stopTimer();
-      setPhaseIndex(getFirstStepIndexForExercise(exerciseIndex));
-      setSwitchRemainingSeconds(3);
-      setScreen('prepare');
-      setLiveMessage('Gör dig redo.');
+      setAbortDialogOpen(false);
+      setFlow({
+        screen: 'preparation',
+        exerciseIndex: Math.min(Math.max(exerciseIndex, 0), WORKOUT_PLAN.exercises.length - 1)
+      });
     },
     [stopTimer]
   );
 
-  const goToPreviousExercise = useCallback(() => {
-    jumpToExercise(currentStep.exerciseIndex - 1);
-  }, [currentStep.exerciseIndex, jumpToExercise]);
+  const handleTimerComplete = useCallback(() => {
+    if (flow.screen === 'transition') {
+      startPhase(flow.nextPhaseIndex);
+      return;
+    }
 
-  const goToNextExercise = useCallback(() => {
-    jumpToExercise(currentStep.exerciseIndex + 1);
-  }, [currentStep.exerciseIndex, jumpToExercise]);
+    if (flow.screen !== 'active') {
+      return;
+    }
 
-  const continueToNextExercise = useCallback(() => {
-    const nextIndex = Math.min(phaseIndex + 1, steps.length - 1);
-    setPhaseIndex(nextIndex);
-    setScreen('prepare');
-    setLiveMessage('Gör dig redo för nästa övning.');
-  }, [phaseIndex]);
+    const currentPhase = WORKOUT_PHASES[flow.phaseIndex];
+    const nextPhaseIndex = flow.phaseIndex + 1;
+    const nextPhase = WORKOUT_PHASES[nextPhaseIndex];
 
-  const returnHome = useCallback(() => {
-    stopTimer();
-    setScreen('home');
-    setPhaseIndex(0);
-    setLiveMessage('Kotten är redo.');
-  }, [stopTimer]);
+    if (currentPhase.id === 'balance-first-leg') {
+      playCue('step', soundEnabled);
+      setFlow({ screen: 'transition', nextPhaseIndex });
+      startTimer(BALANCE_SWITCH_SECONDS * 1000);
+      return;
+    }
+
+    if (!nextPhase) {
+      playCue('done', soundEnabled);
+      completeWorkout();
+      return;
+    }
+
+    playCue('step', soundEnabled);
+    goToPreparation(getExerciseIndexForPhase(nextPhaseIndex));
+  }, [completeWorkout, flow, goToPreparation, soundEnabled, startPhase, startTimer]);
 
   useEffect(() => {
-    if (screen !== 'switch-leg') {
-      return undefined;
-    }
+    timerCompleteActionRef.current = handleTimerComplete;
+  }, [handleTimerComplete]);
 
-    const transition = currentStep.phase.transition;
-    if (!transition) {
-      return undefined;
-    }
+  const startWorkout = useCallback(() => {
+    unlockAudio();
+    goToPreparation(0);
+  }, [goToPreparation]);
 
-    const endTimeMs = Date.now() + transition.countdownSeconds * 1000;
-
-    const tick = () => {
-      const remainingMs = getRemainingMsFromEndTime(endTimeMs, Date.now());
-      const remainingSeconds = Math.ceil(remainingMs / 1000);
-      setSwitchRemainingSeconds(Math.max(0, remainingSeconds));
-
-      if (remainingMs === 0) {
-        window.clearInterval(intervalId);
-        const nextIndex = Math.min(phaseIndex + 1, steps.length - 1);
-        setPhaseIndex(nextIndex);
-        setScreen('timer');
-        const nextStep = getSafeStep(nextIndex);
-        setLiveMessage(nextStep.phase.instruction);
-        sendFeedback(nextStep.phase.startSpeech, 'start', 40);
-        startTimer(nextStep.phase.durationSeconds * 1000);
+  const toggleSound = useCallback(() => {
+    setSoundEnabled((current) => {
+      const nextValue = !current;
+      if (nextValue) {
+        unlockAudio();
       }
-    };
+      writeLocalStorage(SOUND_STORAGE_KEY, String(nextValue));
+      return nextValue;
+    });
+  }, []);
 
-    const intervalId = window.setInterval(tick, 100);
-    tick();
-    return () => window.clearInterval(intervalId);
-  }, [currentStep, phaseIndex, screen, startTimer]);
+  const requestAbort = useCallback(() => {
+    resumeAfterAbortCancelRef.current = timerState.status === 'running';
+    if (timerState.status === 'running') {
+      pauseTimer();
+    }
+    setAbortDialogOpen(true);
+  }, [pauseTimer, timerState.status]);
+
+  const cancelAbort = useCallback(() => {
+    setAbortDialogOpen(false);
+    if (resumeAfterAbortCancelRef.current) {
+      resumeTimer();
+    }
+    resumeAfterAbortCancelRef.current = false;
+  }, [resumeTimer]);
+
+  const confirmAbort = useCallback(() => {
+    stopTimer();
+    resumeAfterAbortCancelRef.current = false;
+    setAbortDialogOpen(false);
+    setFlow({ screen: 'home' });
+  }, [stopTimer]);
 
   const renderScreen = () => {
-    if (screen === 'home') {
-      return <HomeView stats={stats} onStart={startWorkout} />;
-    }
-
-    if (screen === 'prepare') {
+    if (flow.screen === 'home') {
       return (
-        <PrepareView
-          step={currentStep}
-          onStart={startCurrentPhase}
-          onAbort={abortWorkout}
-          canGoPrevious={canGoPreviousExercise}
-          canGoNext={canGoNextExercise}
-          onPreviousExercise={goToPreviousExercise}
-          onNextExercise={goToNextExercise}
+        <HomeView
+          stats={stats}
+          soundEnabled={soundEnabled}
+          onToggleSound={toggleSound}
+          onStart={startWorkout}
         />
       );
     }
 
-    if (screen === 'timer') {
+    if (flow.screen === 'preparation') {
+      const exercise = WORKOUT_PLAN.exercises[flow.exerciseIndex];
+      const firstPhaseIndex = getFirstPhaseIndexForExercise(exercise);
+
+      return (
+        <PrepareView
+          exercise={exercise}
+          onStart={() => startPhase(firstPhaseIndex)}
+          onAbort={requestAbort}
+        />
+      );
+    }
+
+    if (flow.screen === 'active') {
       return (
         <TimerView
-          step={currentStep}
+          phase={WORKOUT_PHASES[flow.phaseIndex]}
           timer={timerState}
           onPause={pauseTimer}
           onResume={resumeTimer}
-          onAbort={abortWorkout}
-          canGoPrevious={canGoPreviousExercise}
-          canGoNext={canGoNextExercise}
-          onPreviousExercise={goToPreviousExercise}
-          onNextExercise={goToNextExercise}
+          onAbort={requestAbort}
         />
       );
     }
 
-    if (screen === 'switch-leg') {
-      return (
-        <SwitchLegView
-          step={currentStep}
-          remainingSeconds={switchRemainingSeconds}
-          onAbort={abortWorkout}
-          canGoPrevious={canGoPreviousExercise}
-          canGoNext={canGoNextExercise}
-          onPreviousExercise={goToPreviousExercise}
-          onNextExercise={goToNextExercise}
-        />
-      );
+    if (flow.screen === 'transition') {
+      return <SwitchLegView timer={timerState} onAbort={requestAbort} />;
     }
 
-    if (screen === 'exercise-complete') {
-      return (
-        <ExerciseCompleteView
-          completedStep={currentStep}
-          nextStep={getSafeStep(phaseIndex + 1)}
-          onContinue={continueToNextExercise}
-          onAbort={abortWorkout}
-          canGoPrevious={canGoPreviousExercise}
-          canGoNext={canGoNextExercise}
-          onPreviousExercise={goToPreviousExercise}
-          onNextExercise={goToNextExercise}
-        />
-      );
-    }
-
-    return <FinishView stats={stats} onHome={returnHome} />;
+    return (
+      <FinishView
+        stats={stats}
+        completedDate={completedDate}
+        onHome={() => setFlow({ screen: 'home' })}
+      />
+    );
   };
 
   return (
     <>
-      <div className="live-region" aria-live="assertive" aria-atomic="true">
-        {liveMessage}
-      </div>
       {renderScreen()}
+      {abortDialogOpen && <AbortDialog onCancel={cancelAbort} onConfirm={confirmAbort} />}
     </>
   );
 }
