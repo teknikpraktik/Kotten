@@ -2,8 +2,8 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
-const themeColor = '#2f6f55';
-const backgroundColor = '#eef6f1';
+const themeColor = '#fff6cf';
+const backgroundColor = '#fff6cf';
 
 export default defineConfig({
   plugins: [
