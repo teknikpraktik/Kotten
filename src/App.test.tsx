@@ -91,14 +91,18 @@ describe('App workout flow', () => {
     await advanceTimers(60_000);
 
     expect(document.body.textContent).toContain('Tåhävningar i trappa');
-    expect(document.body.textContent).toContain('1 minut.');
+    expect(document.body.textContent).toContain('10 tåhävningar.');
 
     act(() => {
       getButtonByText('Starta').click();
     });
 
-    expect(document.body.textContent).toContain('Tåhävningar i trappa');
-    await advanceTimers(60_000);
+    expect(document.body.textContent).toContain('Gör 10 tåhävningar i trappan');
+    expect(getStoredCompletionCount()).toBe(0);
+
+    act(() => {
+      getButtonByText('Klar').click();
+    });
 
     expect(document.body.textContent).toContain('Tåhävningar med tennisboll');
 
@@ -106,10 +110,15 @@ describe('App workout flow', () => {
       getButtonByText('Starta').click();
     });
 
-    expect(document.body.textContent).toContain('Tåhävningar med tennisboll');
-    await advanceTimers(60_000);
+    expect(document.body.textContent).toContain(
+      'Gör 10 tåhävningar med tennisbollen mellan hälarna'
+    );
 
-    expect(document.body.textContent).toContain('Bra jobbat, du ser stark ut!');
+    act(() => {
+      getButtonByText('Klar').click();
+    });
+
+    expect(getButtonByText('Till startsidan')).toBeTruthy();
     expect(getStoredCompletionCount()).toBe(1);
   });
 

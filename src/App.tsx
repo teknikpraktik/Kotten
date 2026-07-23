@@ -9,9 +9,11 @@ import {
 import { AbortDialog } from './components/AbortDialog';
 import { FinishView } from './components/FinishView';
 import { HomeView } from './components/HomeView';
+import { ManualExerciseView } from './components/ManualExerciseView';
 import { PrepareView } from './components/PrepareView';
 import { SwitchLegView } from './components/SwitchLegView';
 import { TimerView } from './components/TimerView';
+import { getRandomFinishMessage } from './data/finishMessages';
 import { useAbsoluteTimer } from './hooks/useAbsoluteTimer';
 import { useWakeLock } from './hooks/useWakeLock';
 import { playCue, unlockAudio } from './lib/audio';
@@ -50,6 +52,7 @@ export default function App() {
   const [flow, setFlow] = useState<FlowState>({ screen: 'home' });
   const [abortDialogOpen, setAbortDialogOpen] = useState(false);
   const [completedDate, setCompletedDate] = useState(() => formatLocalDate(new Date()));
+  const [completedMessage, setCompletedMessage] = useState(() => getRandomFinishMessage());
   const [soundEnabled, setSoundEnabled] = useState(loadSoundPreference);
   const timerCompleteActionRef = useRef<() => void>(() => undefined);
   const resumeAfterAbortCancelRef = useRef(false);
@@ -74,6 +77,7 @@ export default function App() {
     const nextHistory = addWorkoutCompletion(history, completion);
 
     setCompletedDate(completion.localDate);
+    setCompletedMessage(getRandomFinishMessage());
     setHistory(nextHistory);
     saveWorkoutHistory(nextHistory);
     setFlow({ screen: 'completed' });
@@ -87,9 +91,15 @@ export default function App() {
       unlockAudio();
       setAbortDialogOpen(false);
       setFlow({ screen: 'active', phaseIndex: safePhaseIndex });
+
+      if (phase.mode === 'manual') {
+        stopTimer();
+        return;
+      }
+
       startTimer(phase.durationSeconds * 1000);
     },
-    [startTimer]
+    [startTimer, stopTimer]
   );
 
   const goToPreparation = useCallback(
@@ -104,6 +114,31 @@ export default function App() {
     [stopTimer]
   );
 
+  const completePhase = useCallback(
+    (phaseIndex: number) => {
+      const currentPhase = WORKOUT_PHASES[phaseIndex];
+      const nextPhaseIndex = phaseIndex + 1;
+      const nextPhase = WORKOUT_PHASES[nextPhaseIndex];
+
+      if (currentPhase.id === 'balance-first-leg') {
+        playCue('step', soundEnabled);
+        setFlow({ screen: 'transition', nextPhaseIndex });
+        startTimer(BALANCE_SWITCH_SECONDS * 1000);
+        return;
+      }
+
+      if (!nextPhase) {
+        playCue('done', soundEnabled);
+        completeWorkout();
+        return;
+      }
+
+      playCue('step', soundEnabled);
+      goToPreparation(getExerciseIndexForPhase(nextPhaseIndex));
+    },
+    [completeWorkout, goToPreparation, soundEnabled, startTimer]
+  );
+
   const handleTimerComplete = useCallback(() => {
     if (flow.screen === 'transition') {
       startPhase(flow.nextPhaseIndex);
@@ -114,26 +149,8 @@ export default function App() {
       return;
     }
 
-    const currentPhase = WORKOUT_PHASES[flow.phaseIndex];
-    const nextPhaseIndex = flow.phaseIndex + 1;
-    const nextPhase = WORKOUT_PHASES[nextPhaseIndex];
-
-    if (currentPhase.id === 'balance-first-leg') {
-      playCue('step', soundEnabled);
-      setFlow({ screen: 'transition', nextPhaseIndex });
-      startTimer(BALANCE_SWITCH_SECONDS * 1000);
-      return;
-    }
-
-    if (!nextPhase) {
-      playCue('done', soundEnabled);
-      completeWorkout();
-      return;
-    }
-
-    playCue('step', soundEnabled);
-    goToPreparation(getExerciseIndexForPhase(nextPhaseIndex));
-  }, [completeWorkout, flow, goToPreparation, soundEnabled, startPhase, startTimer]);
+    completePhase(flow.phaseIndex);
+  }, [completePhase, flow, startPhase]);
 
   useEffect(() => {
     timerCompleteActionRef.current = handleTimerComplete;
@@ -204,9 +221,21 @@ export default function App() {
     }
 
     if (flow.screen === 'active') {
+      const phase = WORKOUT_PHASES[flow.phaseIndex];
+
+      if (phase.mode === 'manual') {
+        return (
+          <ManualExerciseView
+            phase={phase}
+            onDone={() => completePhase(flow.phaseIndex)}
+            onAbort={requestAbort}
+          />
+        );
+      }
+
       return (
         <TimerView
-          phase={WORKOUT_PHASES[flow.phaseIndex]}
+          phase={phase}
           timer={timerState}
           onPause={pauseTimer}
           onResume={resumeTimer}
@@ -223,6 +252,7 @@ export default function App() {
       <FinishView
         stats={stats}
         completedDate={completedDate}
+        message={completedMessage}
         onHome={() => setFlow({ screen: 'home' })}
       />
     );

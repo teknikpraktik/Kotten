@@ -3,17 +3,18 @@ import type { StreakStats } from '../lib/streak';
 interface FinishViewProps {
   stats: StreakStats;
   completedDate: string;
+  message: string;
   onHome: () => void;
 }
 
-export function FinishView({ stats, completedDate, onHome }: FinishViewProps) {
+export function FinishView({ stats, completedDate, message, onHome }: FinishViewProps) {
   return (
     <main className="app-shell simple-view">
       <section className="focus-panel done-panel" aria-labelledby="done-title">
         <div className="done-mark" aria-hidden="true">
           ✓
         </div>
-        <h1 id="done-title">Bra jobbat, du ser stark ut!</h1>
+        <h1 id="done-title">{message}</h1>
         <p className="short-copy">{completedDate}</p>
         <p className="streak-line">{stats.currentStreak} dagar i rad</p>
       </section>

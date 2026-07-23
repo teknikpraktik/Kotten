@@ -29,26 +29,32 @@ export const WORKOUT_PLAN: WorkoutPlan = {
     {
       id: 'stair-calf-raises',
       title: 'Tåhävningar i trappa',
-      preparationText: '1 minut.',
+      preparationText: '10 tåhävningar.',
       phases: [
         {
           id: 'stair-calf-raises',
           exerciseId: 'stair-calf-raises',
           title: 'Tåhävningar i trappa',
-          durationSeconds: 60
+          durationSeconds: 60,
+          mode: 'manual',
+          instruction:
+            'Gör 10 tåhävningar i trappan. Sänk hälen långsamt under trappsteget och tryck upp igen. Tryck på Klar när du är färdig.'
         }
       ]
     },
     {
       id: 'ball-calf-raises',
       title: 'Tåhävningar med tennisboll',
-      preparationText: '1 minut.',
+      preparationText: '10 tåhävningar.',
       phases: [
         {
           id: 'ball-calf-raises',
           exerciseId: 'ball-calf-raises',
           title: 'Tåhävningar med tennisboll',
-          durationSeconds: 60
+          durationSeconds: 60,
+          mode: 'manual',
+          instruction:
+            'Gör 10 tåhävningar med tennisbollen mellan hälarna. Tryck på Klar när du är färdig.'
         }
       ]
     }

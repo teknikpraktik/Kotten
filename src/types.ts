@@ -5,12 +5,16 @@ export type WorkoutExerciseId = 'balance-board' | 'stair-calf-raises' | 'ball-ca
 export type WorkoutPhaseId =
   'balance-first-leg' | 'balance-second-leg' | 'stair-calf-raises' | 'ball-calf-raises';
 
+export type WorkoutPhaseMode = 'timer' | 'manual';
+
 export interface WorkoutPhase {
   id: WorkoutPhaseId;
   exerciseId: WorkoutExerciseId;
   title: string;
   label?: string;
   durationSeconds: number;
+  mode?: WorkoutPhaseMode;
+  instruction?: string;
 }
 
 export interface WorkoutExercise {
